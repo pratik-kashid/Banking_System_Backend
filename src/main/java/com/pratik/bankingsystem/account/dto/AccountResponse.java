@@ -19,6 +19,10 @@ public class AccountResponse {
     private AccountStatus status;
 
     private String customerName;
+    private String customerEmail;
     private String phone;
+    private String governmentId;
     private String nomineeName;
+    private String occupation;
+    private String address;
 }

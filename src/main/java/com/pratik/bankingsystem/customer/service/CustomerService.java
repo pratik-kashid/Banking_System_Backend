@@ -1,30 +1,79 @@
 package com.pratik.bankingsystem.customer.service;
 
+import com.pratik.bankingsystem.account.dto.CreateManagedAccountRequest;
 import com.pratik.bankingsystem.common.enums.KycStatus;
-import com.pratik.bankingsystem.customer.dto.CreateCustomerRequest;
+import com.pratik.bankingsystem.common.enums.Role;
+import com.pratik.bankingsystem.common.enums.UserStatus;
 import com.pratik.bankingsystem.customer.entity.Customer;
 import com.pratik.bankingsystem.customer.repository.CustomerRepository;
 import com.pratik.bankingsystem.user.entity.User;
+import com.pratik.bankingsystem.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public Customer createCustomer(User user, CreateCustomerRequest request) {
-        if (customerRepository.existsByUserId(user.getId())) {
-            throw new IllegalStateException("Customer profile already exists for this user");
+    public Customer createOrUpdateCustomerForAccountOpening(CreateManagedAccountRequest request) {
+        Customer existingCustomer = customerRepository.findByGovernmentId(request.getGovernmentId()).orElse(null);
+
+        if (existingCustomer != null) {
+            User linkedUser = existingCustomer.getUser();
+
+            if (!linkedUser.getEmail().equalsIgnoreCase(request.getEmail())) {
+                throw new IllegalStateException("Government ID already exists with another email");
+            }
+
+            linkedUser.setFullName(request.getFullName());
+            linkedUser.setEmail(request.getEmail());
+            userRepository.save(linkedUser);
+
+            existingCustomer.setDateOfBirth(request.getDateOfBirth());
+            existingCustomer.setPhone(request.getPhone());
+            existingCustomer.setAddress(request.getAddress());
+            existingCustomer.setGovernmentId(request.getGovernmentId());
+            existingCustomer.setNomineeName(request.getNomineeName());
+            existingCustomer.setOccupation(request.getOccupation());
+
+            return customerRepository.save(existingCustomer);
         }
 
-        if (customerRepository.existsByGovernmentId(request.getGovernmentId())) {
-            throw new IllegalStateException("Government ID already exists");
+        User existingUserByEmail = userRepository.findByEmail(request.getEmail()).orElse(null);
+
+        User customerUser;
+        if (existingUserByEmail != null) {
+            if (existingUserByEmail.getRole() != Role.CUSTOMER) {
+                throw new IllegalStateException("Email already belongs to a bank staff/admin account");
+            }
+
+            if (customerRepository.existsByUserId(existingUserByEmail.getId())) {
+                throw new IllegalStateException("Customer profile already exists for this email");
+            }
+
+            existingUserByEmail.setFullName(request.getFullName());
+            customerUser = userRepository.save(existingUserByEmail);
+        } else {
+            customerUser = User.builder()
+                    .fullName(request.getFullName())
+                    .email(request.getEmail())
+                    .password(passwordEncoder.encode("TEMP-" + UUID.randomUUID()))
+                    .role(Role.CUSTOMER)
+                    .status(UserStatus.ACTIVE)
+                    .build();
+
+            customerUser = userRepository.save(customerUser);
         }
 
         Customer customer = Customer.builder()
-                .user(user)
+                .user(customerUser)
                 .dateOfBirth(request.getDateOfBirth())
                 .phone(request.getPhone())
                 .address(request.getAddress())
@@ -33,42 +82,6 @@ public class CustomerService {
                 .occupation(request.getOccupation())
                 .kycStatus(KycStatus.PENDING)
                 .build();
-
-        return customerRepository.save(customer);
-    }
-
-    public Customer createOrUpdateCustomer(User user, com.pratik.bankingsystem.account.dto.CreateAccountWithProfileRequest request) {
-        Customer customer = customerRepository.findByUserId(user.getId()).orElse(null);
-
-        if (customer == null) {
-            if (customerRepository.existsByGovernmentId(request.getGovernmentId())) {
-                throw new IllegalStateException("Government ID already exists");
-            }
-
-            customer = Customer.builder()
-                    .user(user)
-                    .dateOfBirth(request.getDateOfBirth())
-                    .phone(request.getPhone())
-                    .address(request.getAddress())
-                    .governmentId(request.getGovernmentId())
-                    .nomineeName(request.getNomineeName())
-                    .occupation(request.getOccupation())
-                    .kycStatus(KycStatus.PENDING)
-                    .build();
-        } else {
-            if (customer.getGovernmentId() != null &&
-                    !customer.getGovernmentId().equals(request.getGovernmentId()) &&
-                    customerRepository.existsByGovernmentId(request.getGovernmentId())) {
-                throw new IllegalStateException("Government ID already exists");
-            }
-
-            customer.setDateOfBirth(request.getDateOfBirth());
-            customer.setPhone(request.getPhone());
-            customer.setAddress(request.getAddress());
-            customer.setGovernmentId(request.getGovernmentId());
-            customer.setNomineeName(request.getNomineeName());
-            customer.setOccupation(request.getOccupation());
-        }
 
         return customerRepository.save(customer);
     }

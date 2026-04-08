@@ -2,7 +2,7 @@ package com.pratik.bankingsystem.account.controller;
 
 import com.pratik.bankingsystem.account.dto.AccountResponse;
 import com.pratik.bankingsystem.account.dto.CreateAccountRequest;
-import com.pratik.bankingsystem.account.dto.CreateAccountWithProfileRequest;
+import com.pratik.bankingsystem.account.dto.CreateManagedAccountRequest;
 import com.pratik.bankingsystem.account.dto.DashboardSummaryResponse;
 import com.pratik.bankingsystem.account.entity.Account;
 import com.pratik.bankingsystem.account.service.AccountService;
@@ -29,15 +29,17 @@ public class AccountController {
     private final CustomerRepository customerRepository;
     private final CustomerService customerService;
 
-    @PostMapping("/me")
-    public AccountResponse createMyAccount(Authentication authentication,
-                                           @Valid @RequestBody CreateAccountWithProfileRequest request) {
-        String email = authentication.getName();
+    @PostMapping
+    public AccountResponse createAccountForCustomer(Authentication authentication,
+                                                    @Valid @RequestBody CreateManagedAccountRequest request) {
+        User staffUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new EntityNotFoundException("Logged in user not found"));
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        if (staffUser.getRole().name().equals("CUSTOMER")) {
+            throw new IllegalStateException("Only bank staff can create customer accounts");
+        }
 
-        Customer customer = customerService.createOrUpdateCustomer(user, request);
+        Customer customer = customerService.createOrUpdateCustomerForAccountOpening(request);
 
         CreateAccountRequest accountRequest = new CreateAccountRequest();
         accountRequest.setAccountType(request.getAccountType());
@@ -45,6 +47,21 @@ public class AccountController {
 
         Account account = accountService.createAccountForCustomer(customer, accountRequest);
         return mapToResponse(account);
+    }
+
+    @GetMapping("/all")
+    public List<AccountResponse> getAllAccounts(Authentication authentication) {
+        User staffUser = userRepository.findByEmail(authentication.getName())
+                .orElseThrow(() -> new EntityNotFoundException("Logged in user not found"));
+
+        if (staffUser.getRole().name().equals("CUSTOMER")) {
+            throw new IllegalStateException("Only bank staff can view all customer accounts");
+        }
+
+        return accountService.getAllAccounts()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
     }
 
     @GetMapping("/customer/{customerId}")
@@ -98,8 +115,12 @@ public class AccountController {
                 .currency(account.getCurrency())
                 .status(account.getStatus())
                 .customerName(account.getCustomer().getUser().getFullName())
+                .customerEmail(account.getCustomer().getUser().getEmail())
                 .phone(account.getCustomer().getPhone())
+                .governmentId(account.getCustomer().getGovernmentId())
                 .nomineeName(account.getCustomer().getNomineeName())
+                .occupation(account.getCustomer().getOccupation())
+                .address(account.getCustomer().getAddress())
                 .build();
     }
 }
