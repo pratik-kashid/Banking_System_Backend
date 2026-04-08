@@ -7,7 +7,6 @@ import com.pratik.bankingsystem.common.enums.TransactionStatus;
 import com.pratik.bankingsystem.common.enums.TransactionType;
 import com.pratik.bankingsystem.common.util.BankingUtils;
 import com.pratik.bankingsystem.common.util.TransactionLimitRules;
-import com.pratik.bankingsystem.security.service.AuthorizationService;
 import com.pratik.bankingsystem.transaction.dto.AmountRequest;
 import com.pratik.bankingsystem.transaction.dto.TransactionFilterRequest;
 import com.pratik.bankingsystem.transaction.dto.TransactionResponse;
@@ -29,7 +28,6 @@ public class TransactionService {
 
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
-    private final AuthorizationService authorizationService;
 
     @Transactional(timeout = 5)
     public TransactionResponse transfer(String email, TransferRequest request) {
@@ -39,8 +37,6 @@ public class TransactionService {
         if (request.getFromAccount().equals(request.getToAccount())) {
             throw new IllegalStateException("Source and destination accounts cannot be same");
         }
-
-        authorizationService.validateAccountOwnership(email, request.getFromAccount());
 
         String firstLock = request.getFromAccount().compareTo(request.getToAccount()) < 0
                 ? request.getFromAccount() : request.getToAccount();
@@ -94,10 +90,6 @@ public class TransactionService {
         Account account = accountRepository.findByAccountNumberForUpdate(request.getAccountNumber())
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
-        if (!authorizationService.getOwnedAccount(email, request.getAccountNumber()).getId().equals(account.getId())) {
-            throw new IllegalStateException("You are not authorized to access this account");
-        }
-
         validateActiveAccount(account);
 
         account.setBalance(account.getBalance().add(request.getAmount()));
@@ -122,10 +114,6 @@ public class TransactionService {
 
         Account account = accountRepository.findByAccountNumberForUpdate(request.getAccountNumber())
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
-
-        if (!authorizationService.getOwnedAccount(email, request.getAccountNumber()).getId().equals(account.getId())) {
-            throw new IllegalStateException("You are not authorized to access this account");
-        }
 
         validateActiveAccount(account);
 
@@ -154,7 +142,8 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> getMyAccountTransactions(String email, String accountNumber) {
-        Account account = authorizationService.getOwnedAccount(email, accountNumber);
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
         return transactionRepository
                 .findByFromAccountIdOrToAccountIdOrderByCreatedAtDesc(account.getId(), account.getId())
