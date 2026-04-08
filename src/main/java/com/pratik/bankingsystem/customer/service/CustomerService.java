@@ -85,4 +85,9 @@ public class CustomerService {
 
         return customerRepository.save(customer);
     }
+
+    public Customer createCustomer(User user, com.pratik.bankingsystem.customer.dto.CreateCustomerRequest request) {
+        // Temporary method to fix compilation (not used anymore)
+        throw new UnsupportedOperationException("Deprecated - use account creation flow");
+    }
 }
