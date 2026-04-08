@@ -35,7 +35,16 @@ public class AccountController {
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
         Customer customer = customerRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new EntityNotFoundException("Customer not found"));
+                .orElseThrow(() -> new IllegalStateException("Complete customer profile before creating account"));
+
+        if (customer.getDateOfBirth() == null ||
+                customer.getPhone() == null ||
+                customer.getAddress() == null ||
+                customer.getGovernmentId() == null ||
+                customer.getNomineeName() == null ||
+                customer.getOccupation() == null) {
+            throw new IllegalStateException("Complete customer profile before creating account");
+        }
 
         Account account = accountService.createAccountForCustomer(customer, request);
         return mapToResponse(account);
@@ -91,6 +100,9 @@ public class AccountController {
                 .balance(account.getBalance())
                 .currency(account.getCurrency())
                 .status(account.getStatus())
+                .customerName(account.getCustomer().getUser().getFullName())
+                .phone(account.getCustomer().getPhone())
+                .nomineeName(account.getCustomer().getNomineeName())
                 .build();
     }
 }

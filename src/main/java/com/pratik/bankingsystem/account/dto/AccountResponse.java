@@ -17,4 +17,8 @@ public class AccountResponse {
     private BigDecimal balance;
     private String currency;
     private AccountStatus status;
+
+    private String customerName;
+    private String phone;
+    private String nomineeName;
 }

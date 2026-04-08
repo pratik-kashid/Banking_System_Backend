@@ -7,7 +7,6 @@ import java.time.LocalDate;
 
 @Data
 public class TransactionFilterRequest {
-
     private String accountNumber;
     private TransactionType type;
     private LocalDate startDate;

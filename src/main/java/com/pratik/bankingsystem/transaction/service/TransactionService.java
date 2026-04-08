@@ -1,12 +1,7 @@
 package com.pratik.bankingsystem.transaction.service;
 
-import com.itextpdf.kernel.pdf.PdfDocument;
-import com.itextpdf.kernel.pdf.PdfWriter;
-import com.itextpdf.layout.Document;
-import com.itextpdf.layout.element.Paragraph;
 import com.pratik.bankingsystem.account.entity.Account;
 import com.pratik.bankingsystem.account.repository.AccountRepository;
-import com.pratik.bankingsystem.audit.service.AuditLogService;
 import com.pratik.bankingsystem.common.enums.AccountStatus;
 import com.pratik.bankingsystem.common.enums.TransactionStatus;
 import com.pratik.bankingsystem.common.enums.TransactionType;
@@ -24,9 +19,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -36,7 +31,6 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final AuthorizationService authorizationService;
-    private final AuditLogService auditLogService;
 
     @Transactional(timeout = 5)
     public TransactionResponse transfer(String email, TransferRequest request) {
@@ -171,47 +165,35 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> search(String email, TransactionFilterRequest request) {
-        if (request.getAccountNumber() != null && !request.getAccountNumber().isBlank()) {
-            authorizationService.validateAccountOwnership(email, request.getAccountNumber());
+        String accountNumber = request.getAccountNumber();
+
+        if (accountNumber != null && !accountNumber.isBlank()) {
+            authorizationService.validateAccountOwnership(email, accountNumber);
+
+            return transactionRepository.searchTransactions(
+                            accountNumber,
+                            request.getType(),
+                            request.getStartDate() != null ? request.getStartDate().atStartOfDay() : null,
+                            request.getEndDate() != null ? request.getEndDate().atTime(23, 59, 59) : null
+                    ).stream()
+                    .map(this::mapToResponse)
+                    .toList();
         }
 
-        List<Transaction> list = transactionRepository.searchTransactions(
-                request.getAccountNumber(),
-                request.getType(),
-                request.getStartDate() != null ? request.getStartDate().atStartOfDay() : null,
-                request.getEndDate() != null ? request.getEndDate().atTime(23, 59, 59) : null
-        );
+        var customer = authorizationService.getAuthenticatedCustomer(email);
 
-        return list.stream()
+        return accountRepository.findByCustomerId(customer.getId())
+                .stream()
+                .flatMap(account -> transactionRepository
+                        .findByFromAccountIdOrToAccountIdOrderByCreatedAtDesc(account.getId(), account.getId())
+                        .stream())
+                .distinct()
+                .filter(txn -> request.getType() == null || txn.getType() == request.getType())
+                .filter(txn -> request.getStartDate() == null || !txn.getCreatedAt().toLocalDate().isBefore(request.getStartDate()))
+                .filter(txn -> request.getEndDate() == null || !txn.getCreatedAt().toLocalDate().isAfter(request.getEndDate()))
+                .sorted(Comparator.comparing(Transaction::getCreatedAt).reversed())
                 .map(this::mapToResponse)
                 .toList();
-    }
-
-    public byte[] generateStatement(String email) throws Exception {
-        List<TransactionResponse> transactions = search(email, new TransactionFilterRequest());
-
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-
-        PdfWriter writer = new PdfWriter(out);
-        PdfDocument pdf = new PdfDocument(writer);
-        Document document = new Document(pdf);
-
-        document.add(new Paragraph("Bank Statement"));
-        document.add(new Paragraph("Generated On: " + java.time.LocalDateTime.now()));
-        document.add(new Paragraph(" "));
-
-        for (TransactionResponse t : transactions) {
-            document.add(new Paragraph(
-                    "Ref: " + t.getReferenceNumber()
-                            + " | Type: " + t.getType()
-                            + " | Amount: ₹" + t.getAmount()
-                            + " | Date: " + t.getCreatedAt()
-            ));
-        }
-
-        document.close();
-
-        return out.toByteArray();
     }
 
     private void validateAmount(BigDecimal amount) {

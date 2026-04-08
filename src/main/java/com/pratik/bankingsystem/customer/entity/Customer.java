@@ -34,6 +34,15 @@ public class Customer extends BaseEntity {
     @Column(nullable = false, length = 255)
     private String address;
 
+    @Column(name = "government_id", length = 50, unique = true)
+    private String governmentId;
+
+    @Column(name = "nominee_name", length = 100)
+    private String nomineeName;
+
+    @Column(length = 100)
+    private String occupation;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "kyc_status", nullable = false, length = 20)
     private KycStatus kycStatus;

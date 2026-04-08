@@ -64,9 +64,9 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
-    public Map<String, Object> handleGeneric(Exception ex, HttpServletRequest request) {
-        logFailure(ex.getMessage(), request);
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected error occurred");
+    public Map<String, Object> handleGeneric(Exception ex) {
+        ex.printStackTrace();
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
     }
 
     private void logFailure(String message, HttpServletRequest request) {

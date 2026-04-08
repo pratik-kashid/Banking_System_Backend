@@ -34,13 +34,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                                                         @Param("startOfDay") LocalDateTime startOfDay);
 
     @Query("""
-           select t from Transaction t
-           where (
-                    :accountNumber is null
-                    or :accountNumber = ''
-                    or (t.fromAccount is not null and t.fromAccount.accountNumber = :accountNumber)
-                    or (t.toAccount is not null and t.toAccount.accountNumber = :accountNumber)
-                 )
+           select distinct t
+           from Transaction t
+           where
+             (:accountNumber is null or
+              (t.fromAccount is not null and t.fromAccount.accountNumber = :accountNumber) or
+              (t.toAccount is not null and t.toAccount.accountNumber = :accountNumber))
              and (:type is null or t.type = :type)
              and (:startDate is null or t.createdAt >= :startDate)
              and (:endDate is null or t.createdAt <= :endDate)

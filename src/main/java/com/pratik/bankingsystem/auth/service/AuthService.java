@@ -5,14 +5,12 @@ import com.pratik.bankingsystem.auth.dto.LoginRequest;
 import com.pratik.bankingsystem.auth.dto.RegisterRequest;
 import com.pratik.bankingsystem.common.enums.Role;
 import com.pratik.bankingsystem.common.enums.UserStatus;
-import com.pratik.bankingsystem.customer.entity.Customer;
-import com.pratik.bankingsystem.customer.repository.CustomerRepository;
-import com.pratik.bankingsystem.common.enums.KycStatus;
 import com.pratik.bankingsystem.security.jwt.JwtService;
 import com.pratik.bankingsystem.user.entity.User;
 import com.pratik.bankingsystem.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.*;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +21,6 @@ import java.util.Map;
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final CustomerRepository customerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
@@ -42,15 +39,6 @@ public class AuthService {
                 .build();
 
         User savedUser = userRepository.save(user);
-
-        Customer customer = Customer.builder()
-                .user(savedUser)
-                .phone("NA")
-                .address("NA")
-                .kycStatus(KycStatus.PENDING)
-                .build();
-
-        customerRepository.save(customer);
 
         String token = jwtService.generateToken(
                 savedUser.getEmail(),
