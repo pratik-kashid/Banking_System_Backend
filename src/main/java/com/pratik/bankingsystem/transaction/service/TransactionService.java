@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 
@@ -165,29 +164,23 @@ public class TransactionService {
     }
 
     public List<TransactionResponse> search(String email, TransactionFilterRequest request) {
-        String accountNumber = request.getAccountNumber();
+        if (request.getAccountNumber() != null && !request.getAccountNumber().isBlank()) {
+            Account account = accountRepository.findByAccountNumber(request.getAccountNumber())
+                    .orElseThrow(() -> new EntityNotFoundException("Account not found"));
 
-        if (accountNumber != null && !accountNumber.isBlank()) {
-            authorizationService.validateAccountOwnership(email, accountNumber);
-
-            return transactionRepository.searchTransactions(
-                            accountNumber,
-                            request.getType(),
-                            request.getStartDate() != null ? request.getStartDate().atStartOfDay() : null,
-                            request.getEndDate() != null ? request.getEndDate().atTime(23, 59, 59) : null
-                    ).stream()
+            return transactionRepository
+                    .findByFromAccountIdOrToAccountIdOrderByCreatedAtDesc(account.getId(), account.getId())
+                    .stream()
+                    .filter(txn -> request.getType() == null || txn.getType() == request.getType())
+                    .filter(txn -> request.getStartDate() == null || !txn.getCreatedAt().toLocalDate().isBefore(request.getStartDate()))
+                    .filter(txn -> request.getEndDate() == null || !txn.getCreatedAt().toLocalDate().isAfter(request.getEndDate()))
+                    .sorted(Comparator.comparing(Transaction::getCreatedAt).reversed())
                     .map(this::mapToResponse)
                     .toList();
         }
 
-        var customer = authorizationService.getAuthenticatedCustomer(email);
-
-        return accountRepository.findByCustomerId(customer.getId())
+        return transactionRepository.findAll()
                 .stream()
-                .flatMap(account -> transactionRepository
-                        .findByFromAccountIdOrToAccountIdOrderByCreatedAtDesc(account.getId(), account.getId())
-                        .stream())
-                .distinct()
                 .filter(txn -> request.getType() == null || txn.getType() == request.getType())
                 .filter(txn -> request.getStartDate() == null || !txn.getCreatedAt().toLocalDate().isBefore(request.getStartDate()))
                 .filter(txn -> request.getEndDate() == null || !txn.getCreatedAt().toLocalDate().isAfter(request.getEndDate()))

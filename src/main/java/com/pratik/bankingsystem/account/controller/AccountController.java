@@ -32,12 +32,8 @@ public class AccountController {
     @PostMapping
     public AccountResponse createAccountForCustomer(Authentication authentication,
                                                     @Valid @RequestBody CreateManagedAccountRequest request) {
-        User staffUser = userRepository.findByEmail(authentication.getName())
+        userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Logged in user not found"));
-
-        if (staffUser.getRole().name().equals("CUSTOMER")) {
-            throw new IllegalStateException("Only bank staff can create customer accounts");
-        }
 
         Customer customer = customerService.createOrUpdateCustomerForAccountOpening(request);
 
@@ -51,12 +47,8 @@ public class AccountController {
 
     @GetMapping("/all")
     public List<AccountResponse> getAllAccounts(Authentication authentication) {
-        User staffUser = userRepository.findByEmail(authentication.getName())
+        userRepository.findByEmail(authentication.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Logged in user not found"));
-
-        if (staffUser.getRole().name().equals("CUSTOMER")) {
-            throw new IllegalStateException("Only bank staff can view all customer accounts");
-        }
 
         return accountService.getAllAccounts()
                 .stream()
