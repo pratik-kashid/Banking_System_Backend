@@ -36,4 +36,40 @@ public class CustomerService {
 
         return customerRepository.save(customer);
     }
+
+    public Customer createOrUpdateCustomer(User user, com.pratik.bankingsystem.account.dto.CreateAccountWithProfileRequest request) {
+        Customer customer = customerRepository.findByUserId(user.getId()).orElse(null);
+
+        if (customer == null) {
+            if (customerRepository.existsByGovernmentId(request.getGovernmentId())) {
+                throw new IllegalStateException("Government ID already exists");
+            }
+
+            customer = Customer.builder()
+                    .user(user)
+                    .dateOfBirth(request.getDateOfBirth())
+                    .phone(request.getPhone())
+                    .address(request.getAddress())
+                    .governmentId(request.getGovernmentId())
+                    .nomineeName(request.getNomineeName())
+                    .occupation(request.getOccupation())
+                    .kycStatus(KycStatus.PENDING)
+                    .build();
+        } else {
+            if (customer.getGovernmentId() != null &&
+                    !customer.getGovernmentId().equals(request.getGovernmentId()) &&
+                    customerRepository.existsByGovernmentId(request.getGovernmentId())) {
+                throw new IllegalStateException("Government ID already exists");
+            }
+
+            customer.setDateOfBirth(request.getDateOfBirth());
+            customer.setPhone(request.getPhone());
+            customer.setAddress(request.getAddress());
+            customer.setGovernmentId(request.getGovernmentId());
+            customer.setNomineeName(request.getNomineeName());
+            customer.setOccupation(request.getOccupation());
+        }
+
+        return customerRepository.save(customer);
+    }
 }

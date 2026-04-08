@@ -2,11 +2,13 @@ package com.pratik.bankingsystem.account.controller;
 
 import com.pratik.bankingsystem.account.dto.AccountResponse;
 import com.pratik.bankingsystem.account.dto.CreateAccountRequest;
+import com.pratik.bankingsystem.account.dto.CreateAccountWithProfileRequest;
 import com.pratik.bankingsystem.account.dto.DashboardSummaryResponse;
 import com.pratik.bankingsystem.account.entity.Account;
 import com.pratik.bankingsystem.account.service.AccountService;
 import com.pratik.bankingsystem.customer.entity.Customer;
 import com.pratik.bankingsystem.customer.repository.CustomerRepository;
+import com.pratik.bankingsystem.customer.service.CustomerService;
 import com.pratik.bankingsystem.user.entity.User;
 import com.pratik.bankingsystem.user.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -25,28 +27,23 @@ public class AccountController {
     private final AccountService accountService;
     private final UserRepository userRepository;
     private final CustomerRepository customerRepository;
+    private final CustomerService customerService;
 
     @PostMapping("/me")
     public AccountResponse createMyAccount(Authentication authentication,
-                                           @Valid @RequestBody CreateAccountRequest request) {
+                                           @Valid @RequestBody CreateAccountWithProfileRequest request) {
         String email = authentication.getName();
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        Customer customer = customerRepository.findByUserId(user.getId())
-                .orElseThrow(() -> new IllegalStateException("Complete customer profile before creating account"));
+        Customer customer = customerService.createOrUpdateCustomer(user, request);
 
-        if (customer.getDateOfBirth() == null ||
-                customer.getPhone() == null ||
-                customer.getAddress() == null ||
-                customer.getGovernmentId() == null ||
-                customer.getNomineeName() == null ||
-                customer.getOccupation() == null) {
-            throw new IllegalStateException("Complete customer profile before creating account");
-        }
+        CreateAccountRequest accountRequest = new CreateAccountRequest();
+        accountRequest.setAccountType(request.getAccountType());
+        accountRequest.setCurrency(request.getCurrency());
 
-        Account account = accountService.createAccountForCustomer(customer, request);
+        Account account = accountService.createAccountForCustomer(customer, accountRequest);
         return mapToResponse(account);
     }
 
