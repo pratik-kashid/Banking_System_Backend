@@ -1,8 +1,8 @@
 server:
   port: ${PORT:8080}
   error:
-    whitelabel:
-      enabled: false
+    include-message: always
+    include-binding-errors: always
 
 spring:
   datasource:
@@ -27,3 +27,8 @@ app:
 
   cors:
     allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}
+
+logging:
+  level:
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
